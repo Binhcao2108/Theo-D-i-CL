@@ -59,7 +59,6 @@ export const parseExcelFile = async (file: File): Promise<{ data: TicketRecord[]
           errorElement: mapping.errorElement ? String(row[mapping.errorElement]) : 'N/A',
           errorCause: mapping.errorCause ? String(row[mapping.errorCause]) : 'N/A',
           treatmentDirection: mapping.treatmentDirection ? String(row[mapping.treatmentDirection]) : 'N/A',
-          raw: row,
         }));
 
         resolve({ data: records, mapping, headers });

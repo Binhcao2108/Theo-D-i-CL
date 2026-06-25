@@ -7,7 +7,6 @@ import { LayoutDashboard, FileUp } from 'lucide-react';
 
 export default function App() {
   const [data, setData] = useState<TicketRecord[] | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +16,6 @@ export default function App() {
     try {
       const result = await parseExcelFile(file);
       setData(result.data);
-      setHeaders(result.headers);
     } catch (err: any) {
       setError(err.message || 'Có lỗi xảy ra khi đọc file Excel');
     } finally {
@@ -73,7 +71,7 @@ export default function App() {
         )}
 
         {data && (
-          <Dashboard data={data} headers={headers} />
+          <Dashboard data={data} />
         )}
       </main>
     </div>

@@ -105,7 +105,7 @@ export const CustomPieChart = ({ data, title, onClick }: { data: ChartData[], ti
             outerRadius={80}
             paddingAngle={5}
             dataKey="value"
-            onClick={(data) => onClick?.(data.name)}
+            onClick={(data: any) => onClick?.(data.name)}
             style={{ cursor: onClick ? 'pointer' : 'default' }}
           >
             {data.map((entry, index) => (

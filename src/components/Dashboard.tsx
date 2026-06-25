@@ -5,7 +5,6 @@ import { Users, AlertTriangle, Activity, Database, Filter, Check, ChevronDown } 
 
 interface DashboardProps {
   data: TicketRecord[];
-  headers: string[];
 }
 
 const countFrequencies = (data: any[], key: keyof TicketRecord): ChartData[] => {
@@ -21,7 +20,7 @@ const countFrequencies = (data: any[], key: keyof TicketRecord): ChartData[] => 
     .sort((a, b) => b.value - a.value);
 };
 
-export function Dashboard({ data, headers }: DashboardProps) {
+export function Dashboard({ data }: DashboardProps) {
   const [filters, setFilters] = useState<Record<string, string[]>>({
     technician: [],
     pop: [],
@@ -321,7 +320,7 @@ export function Dashboard({ data, headers }: DashboardProps) {
               {filteredData.length} bản ghi
             </span>
           </h3>
-          {Object.values(filters).some(arr => arr.length > 0) && (
+          {Object.values(filters).some((arr: any) => arr.length > 0) && (
             <button 
               onClick={() => setFilters({technician: [], pop: [], block: [], inputStatus: [], treatmentDirection: [], errorElement: [], errorCause: []})}
               className="px-3 py-1 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
@@ -334,23 +333,31 @@ export function Dashboard({ data, headers }: DashboardProps) {
           <table className="w-full text-left text-sm text-slate-600 border-collapse whitespace-nowrap">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 sticky top-0 z-10 shadow-sm backdrop-blur-md">
               <tr>
-                {headers.map((h, i) => (
-                  <th key={i} className="px-6 py-3 border-b border-slate-200 font-semibold">{h}</th>
-                ))}
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Số Hợp Đồng</th>
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">KTV</th>
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Tập Điểm (POP)</th>
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Block</th>
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">(Cấp 1)Tình trạng đầu vào</th>
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">(Cấp 1)Phần tử lỗi</th>
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">(Cấp 1)Nguyên nhân lỗi</th>
+                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Hướng xử lý</th>
               </tr>
             </thead>
             <tbody>
               {filteredData.length > 0 ? filteredData.map((row, i) => (
                 <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                  {headers.map((h, colIdx) => (
-                    <td key={colIdx} className="px-6 py-4">
-                      {row.raw[h] !== undefined && row.raw[h] !== null ? String(row.raw[h]) : ''}
-                    </td>
-                  ))}
+                  <td className="px-6 py-4">{row.contractId}</td>
+                  <td className="px-6 py-4">{row.technician}</td>
+                  <td className="px-6 py-4">{row.pop}</td>
+                  <td className="px-6 py-4">{row.block}</td>
+                  <td className="px-6 py-4">{row.inputStatus}</td>
+                  <td className="px-6 py-4">{row.errorElement}</td>
+                  <td className="px-6 py-4">{row.errorCause}</td>
+                  <td className="px-6 py-4">{row.treatmentDirection}</td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={headers.length} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                     Không có dữ liệu phù hợp với bộ lọc
                   </td>
                 </tr>

@@ -47,54 +47,95 @@ export function Dashboard({ data, headers }: DashboardProps) {
     return countFrequencies(data, key);
   };
 
-  const filterOptions = useMemo(() => ({
-    technician: getUniqueValuesWithCount('technician'),
-    pop: getUniqueValuesWithCount('pop'),
-    block: getUniqueValuesWithCount('block'),
-    inputStatus: getUniqueValuesWithCount('inputStatus'),
-    treatmentDirection: getUniqueValuesWithCount('treatmentDirection'),
-    errorElement: getUniqueValuesWithCount('errorElement'),
-    errorCause: getUniqueValuesWithCount('errorCause')
-  }), [data]);
-
-  const getFilteredDataExcept = (excludeField: keyof typeof filters) => {
-    return data.filter(item => {
-      return (
-        (excludeField === 'technician' || filters.technician.length === 0 || filters.technician.includes(item.technician)) &&
-        (excludeField === 'pop' || filters.pop.length === 0 || filters.pop.includes(item.pop)) &&
-        (excludeField === 'block' || filters.block?.length === 0 || filters.block?.includes(item.block)) &&
-        (excludeField === 'inputStatus' || filters.inputStatus?.length === 0 || filters.inputStatus?.includes(item.inputStatus)) &&
-        (excludeField === 'treatmentDirection' || filters.treatmentDirection?.length === 0 || filters.treatmentDirection?.includes(item.treatmentDirection)) &&
-        (excludeField === 'errorElement' || filters.errorElement.length === 0 || filters.errorElement.includes(item.errorElement)) &&
-        (excludeField === 'errorCause' || filters.errorCause.length === 0 || filters.errorCause.includes(item.errorCause))
-      );
-    });
-  };
-
   const filteredData = useMemo(() => {
+    // Pre-convert arrays to Sets for O(1) lookups
+    const filterSets = {
+      technician: new Set(filters.technician),
+      pop: new Set(filters.pop),
+      block: new Set(filters.block),
+      inputStatus: new Set(filters.inputStatus),
+      treatmentDirection: new Set(filters.treatmentDirection),
+      errorElement: new Set(filters.errorElement),
+      errorCause: new Set(filters.errorCause)
+    };
+
     return data.filter(item => {
       return (
-        (filters.technician.length === 0 || filters.technician.includes(item.technician)) &&
-        (filters.pop.length === 0 || filters.pop.includes(item.pop)) &&
-        (filters.block?.length === 0 || filters.block?.includes(item.block)) &&
-        (filters.inputStatus?.length === 0 || filters.inputStatus?.includes(item.inputStatus)) &&
-        (filters.treatmentDirection?.length === 0 || filters.treatmentDirection?.includes(item.treatmentDirection)) &&
-        (filters.errorElement.length === 0 || filters.errorElement.includes(item.errorElement)) &&
-        (filters.errorCause.length === 0 || filters.errorCause.includes(item.errorCause))
+        (filterSets.technician.size === 0 || filterSets.technician.has(item.technician)) &&
+        (filterSets.pop.size === 0 || filterSets.pop.has(item.pop)) &&
+        (filterSets.block.size === 0 || filterSets.block.has(item.block)) &&
+        (filterSets.inputStatus.size === 0 || filterSets.inputStatus.has(item.inputStatus)) &&
+        (filterSets.treatmentDirection.size === 0 || filterSets.treatmentDirection.has(item.treatmentDirection)) &&
+        (filterSets.errorElement.size === 0 || filterSets.errorElement.has(item.errorElement)) &&
+        (filterSets.errorCause.size === 0 || filterSets.errorCause.has(item.errorCause))
       );
     });
   }, [data, filters]);
 
-  const topKTVs = useMemo(() => countFrequencies(getFilteredDataExcept('technician'), 'technician').slice(0, 15), [data, filters]);
-  const topPOPs = useMemo(() => countFrequencies(getFilteredDataExcept('pop'), 'pop').slice(0, 15), [data, filters]);
-  const topBlocks = useMemo(() => countFrequencies(getFilteredDataExcept('block'), 'block').slice(0, 15), [data, filters]);
-  const inputStatuses = useMemo(() => countFrequencies(getFilteredDataExcept('inputStatus'), 'inputStatus').slice(0, 15), [data, filters]);
-  const treatmentDirections = useMemo(() => countFrequencies(getFilteredDataExcept('treatmentDirection'), 'treatmentDirection').slice(0, 15), [data, filters]);
-  const errorElements = useMemo(() => countFrequencies(getFilteredDataExcept('errorElement'), 'errorElement').slice(0, 15), [data, filters]);
-  const errorCauses = useMemo(() => countFrequencies(getFilteredDataExcept('errorCause'), 'errorCause').slice(0, 15), [data, filters]);
+  const {
+    filterOptions,
+    topKTVs,
+    topPOPs,
+    topBlocks,
+    inputStatuses,
+    treatmentDirections,
+    errorElements,
+    errorCauses,
+    uniqueKTVs,
+    uniquePOPs
+  } = useMemo(() => {
+    const counts = {
+      technician: {} as Record<string, number>,
+      pop: {} as Record<string, number>,
+      block: {} as Record<string, number>,
+      inputStatus: {} as Record<string, number>,
+      treatmentDirection: {} as Record<string, number>,
+      errorElement: {} as Record<string, number>,
+      errorCause: {} as Record<string, number>,
+    };
 
-  const uniqueKTVs = useMemo(() => new Set(filteredData.map(d => d.technician).filter(v => v !== 'N/A')).size, [filteredData]);
-  const uniquePOPs = useMemo(() => new Set(filteredData.map(d => d.pop).filter(v => v !== 'N/A')).size, [filteredData]);
+    for (let i = 0; i < filteredData.length; i++) {
+      const item = filteredData[i];
+      const fields = ['technician', 'pop', 'block', 'inputStatus', 'treatmentDirection', 'errorElement', 'errorCause'] as const;
+      for (const field of fields) {
+        const val = item[field as keyof typeof item];
+        if (val && val !== 'N/A' && val.toString().trim() !== '') {
+          counts[field][val] = (counts[field][val] || 0) + 1;
+        }
+      }
+    }
+
+    const sortAndFormat = (obj: Record<string, number>) => Object.entries(obj).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+
+    const technicianOptions = sortAndFormat(counts.technician);
+    const popOptions = sortAndFormat(counts.pop);
+    const blockOptions = sortAndFormat(counts.block);
+    const inputStatusOptions = sortAndFormat(counts.inputStatus);
+    const treatmentDirectionOptions = sortAndFormat(counts.treatmentDirection);
+    const errorElementOptions = sortAndFormat(counts.errorElement);
+    const errorCauseOptions = sortAndFormat(counts.errorCause);
+
+    return {
+      filterOptions: {
+        technician: technicianOptions,
+        pop: popOptions,
+        block: blockOptions,
+        inputStatus: inputStatusOptions,
+        treatmentDirection: treatmentDirectionOptions,
+        errorElement: errorElementOptions,
+        errorCause: errorCauseOptions,
+      },
+      topKTVs: technicianOptions.slice(0, 15),
+      topPOPs: popOptions.slice(0, 15),
+      topBlocks: blockOptions.slice(0, 15),
+      inputStatuses: inputStatusOptions.slice(0, 15),
+      treatmentDirections: treatmentDirectionOptions.slice(0, 15),
+      errorElements: errorElementOptions.slice(0, 15),
+      errorCauses: errorCauseOptions.slice(0, 15),
+      uniqueKTVs: Object.keys(counts.technician).length,
+      uniquePOPs: Object.keys(counts.pop).length,
+    };
+  }, [filteredData]);
 
   const StatCard = ({ title, value, icon: Icon, color }: any) => (
     <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center space-x-4 shadow-sm">
@@ -246,28 +287,28 @@ export function Dashboard({ data, headers }: DashboardProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
         <CustomBarChart 
-          data={treatmentDirections} 
-          title="Hướng xử lý" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('treatmentDirection', val)}
-          activeValue={filters.treatmentDirection?.length === 1 ? filters.treatmentDirection[0] : undefined}
-        />
-        <CustomBarChart 
           data={errorElements} 
           title="Phần tử lỗi phổ biến" 
           layout="vertical"
           onClick={(val) => handleChartClick('errorElement', val)}
           activeValue={filters.errorElement?.length === 1 ? filters.errorElement[0] : undefined}
         />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
         <CustomBarChart 
           data={errorCauses} 
           title="Nguyên nhân lỗi" 
           layout="vertical"
           onClick={(val) => handleChartClick('errorCause', val)}
           activeValue={filters.errorCause?.length === 1 ? filters.errorCause[0] : undefined}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+        <CustomBarChart 
+          data={treatmentDirections} 
+          title="Hướng xử lý" 
+          layout="vertical"
+          onClick={(val) => handleChartClick('treatmentDirection', val)}
+          activeValue={filters.treatmentDirection?.length === 1 ? filters.treatmentDirection[0] : undefined}
         />
       </div>
 

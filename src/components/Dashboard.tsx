@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { TicketRecord, ChartData } from '../types';
 import { CustomBarChart } from './Charts';
-import { Users, AlertTriangle, Activity, Database, Filter, Check, ChevronDown } from 'lucide-react';
+import { Users, AlertTriangle, Activity, Database, Filter, Check, ChevronDown, Search, Download, FileSpreadsheet, Image as ImageIcon } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
 
 interface DashboardProps {
   data: TicketRecord[];
@@ -20,6 +22,94 @@ const countFrequencies = (data: any[], key: keyof TicketRecord): ChartData[] => 
     .sort((a, b) => b.value - a.value);
 };
 
+const MultiSelect = ({ label, options, selected, onChange, onClear }: { label: string, options: ChartData[], selected: string[], onChange: (val: string) => void, onClear: () => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    return options.filter(opt => opt.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [options, searchTerm]);
+
+  return (
+    <div className="flex flex-col space-y-1 relative">
+      <label className="text-xs font-medium text-slate-500">{label}</label>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 flex items-center justify-between cursor-pointer hover:border-indigo-400 transition-colors"
+      >
+        <span className="truncate pr-2">
+          {selected.length === 0 ? 'Tất cả' : `${selected.length} đã chọn`}
+        </span>
+        <ChevronDown className="w-4 h-4 text-slate-400" />
+      </div>
+      
+      {isOpen && (
+        <div className="absolute top-[60px] left-0 w-full min-w-[200px] bg-white border border-slate-200 rounded-lg shadow-xl z-50 flex flex-col p-1 max-h-72">
+          <div className="p-1 pb-2">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-2 top-2" />
+              <input
+                type="text"
+                className="w-full pl-8 pr-2 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Tìm kiếm..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+          
+          <div className="overflow-y-auto flex-1">
+            <div 
+              className="px-2 py-2 hover:bg-slate-50 rounded-md cursor-pointer text-sm flex items-center text-slate-600 mb-1"
+              onClick={() => {
+                onClear();
+                setSearchTerm("");
+                setIsOpen(false);
+              }}
+            >
+              <div className="w-4 h-4 mr-2 border border-slate-300 rounded-sm flex items-center justify-center flex-shrink-0">
+                {selected.length === 0 && <Check className="w-3 h-3 text-indigo-600" />}
+              </div>
+              <span className={selected.length === 0 ? 'font-medium text-indigo-600' : ''}>Tất cả</span>
+            </div>
+            <div className="h-px bg-slate-100 my-1"></div>
+            {filteredOptions.length > 0 ? filteredOptions.map(opt => {
+              const isSelected = selected.includes(opt.name);
+              return (
+                <div 
+                  key={opt.name}
+                  className={`px-2 py-2 hover:bg-slate-50 rounded-md cursor-pointer text-sm flex items-center justify-between ${isSelected ? 'bg-indigo-50/50' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(opt.name);
+                  }}
+                >
+                  <div className="flex items-center overflow-hidden pr-2">
+                    <div className={`w-4 h-4 mr-2 border rounded-sm flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'}`}>
+                       {isSelected && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className="truncate text-slate-700">{opt.name}</span>
+                  </div>
+                  <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full flex-shrink-0">{opt.value}</span>
+                </div>
+              );
+            }) : (
+              <div className="px-2 py-4 text-center text-xs text-slate-500">
+                Không tìm thấy kết quả
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {isOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+      )}
+    </div>
+  );
+};
+
 export function Dashboard({ data }: DashboardProps) {
   const [filters, setFilters] = useState<Record<string, string[]>>({
     technician: [],
@@ -34,10 +124,10 @@ export function Dashboard({ data }: DashboardProps) {
   const handleChartClick = (field: keyof typeof filters, value: string) => {
     setFilters(prev => {
       const current = prev[field] || [];
-      if (current.length === 1 && current[0] === value) {
-        return { ...prev, [field]: [] };
+      if (current.includes(value)) {
+        return { ...prev, [field]: current.filter(v => v !== value) };
       } else {
-        return { ...prev, [field]: [value] };
+        return { ...prev, [field]: [...current, value] };
       }
     });
   };
@@ -46,32 +136,8 @@ export function Dashboard({ data }: DashboardProps) {
     return countFrequencies(data, key);
   };
 
-  const filteredData = useMemo(() => {
-    // Pre-convert arrays to Sets for O(1) lookups
-    const filterSets = {
-      technician: new Set(filters.technician),
-      pop: new Set(filters.pop),
-      block: new Set(filters.block),
-      inputStatus: new Set(filters.inputStatus),
-      treatmentDirection: new Set(filters.treatmentDirection),
-      errorElement: new Set(filters.errorElement),
-      errorCause: new Set(filters.errorCause)
-    };
-
-    return data.filter(item => {
-      return (
-        (filterSets.technician.size === 0 || filterSets.technician.has(item.technician)) &&
-        (filterSets.pop.size === 0 || filterSets.pop.has(item.pop)) &&
-        (filterSets.block.size === 0 || filterSets.block.has(item.block)) &&
-        (filterSets.inputStatus.size === 0 || filterSets.inputStatus.has(item.inputStatus)) &&
-        (filterSets.treatmentDirection.size === 0 || filterSets.treatmentDirection.has(item.treatmentDirection)) &&
-        (filterSets.errorElement.size === 0 || filterSets.errorElement.has(item.errorElement)) &&
-        (filterSets.errorCause.size === 0 || filterSets.errorCause.has(item.errorCause))
-      );
-    });
-  }, [data, filters]);
-
   const {
+    filteredData,
     filterOptions,
     topKTVs,
     topPOPs,
@@ -83,6 +149,17 @@ export function Dashboard({ data }: DashboardProps) {
     uniqueKTVs,
     uniquePOPs
   } = useMemo(() => {
+    // Pre-convert arrays to Sets for O(1) lookups
+    const filterSets = {
+      technician: new Set(filters.technician),
+      pop: new Set(filters.pop),
+      block: new Set(filters.block),
+      inputStatus: new Set(filters.inputStatus),
+      treatmentDirection: new Set(filters.treatmentDirection),
+      errorElement: new Set(filters.errorElement),
+      errorCause: new Set(filters.errorCause)
+    };
+
     const counts = {
       technician: {} as Record<string, number>,
       pop: {} as Record<string, number>,
@@ -93,15 +170,36 @@ export function Dashboard({ data }: DashboardProps) {
       errorCause: {} as Record<string, number>,
     };
 
-    for (let i = 0; i < filteredData.length; i++) {
-      const item = filteredData[i];
-      const fields = ['technician', 'pop', 'block', 'inputStatus', 'treatmentDirection', 'errorElement', 'errorCause'] as const;
-      for (const field of fields) {
-        const val = item[field as keyof typeof item];
+    const resultFilteredData = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+
+      const matchT = filterSets.technician.size === 0 || filterSets.technician.has(item.technician);
+      const matchP = filterSets.pop.size === 0 || filterSets.pop.has(item.pop);
+      const matchB = filterSets.block.size === 0 || filterSets.block.has(item.block);
+      const matchI = filterSets.inputStatus.size === 0 || filterSets.inputStatus.has(item.inputStatus);
+      const matchD = filterSets.treatmentDirection.size === 0 || filterSets.treatmentDirection.has(item.treatmentDirection);
+      const matchE = filterSets.errorElement.size === 0 || filterSets.errorElement.has(item.errorElement);
+      const matchC = filterSets.errorCause.size === 0 || filterSets.errorCause.has(item.errorCause);
+
+      if (matchT && matchP && matchB && matchI && matchD && matchE && matchC) {
+        resultFilteredData.push(item);
+      }
+
+      const countIfValid = (field: keyof typeof counts, val: any) => {
         if (val && val !== 'N/A' && val.toString().trim() !== '') {
           counts[field][val] = (counts[field][val] || 0) + 1;
         }
-      }
+      };
+
+      if (matchP && matchB && matchI && matchD && matchE && matchC) countIfValid('technician', item.technician);
+      if (matchT && matchB && matchI && matchD && matchE && matchC) countIfValid('pop', item.pop);
+      if (matchT && matchP && matchI && matchD && matchE && matchC) countIfValid('block', item.block);
+      if (matchT && matchP && matchB && matchD && matchE && matchC) countIfValid('inputStatus', item.inputStatus);
+      if (matchT && matchP && matchB && matchI && matchE && matchC) countIfValid('treatmentDirection', item.treatmentDirection);
+      if (matchT && matchP && matchB && matchI && matchD && matchC) countIfValid('errorElement', item.errorElement);
+      if (matchT && matchP && matchB && matchI && matchD && matchE) countIfValid('errorCause', item.errorCause);
     }
 
     const sortAndFormat = (obj: Record<string, number>) => Object.entries(obj).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
@@ -115,6 +213,7 @@ export function Dashboard({ data }: DashboardProps) {
     const errorCauseOptions = sortAndFormat(counts.errorCause);
 
     return {
+      filteredData: resultFilteredData,
       filterOptions: {
         technician: technicianOptions,
         pop: popOptions,
@@ -134,7 +233,7 @@ export function Dashboard({ data }: DashboardProps) {
       uniqueKTVs: Object.keys(counts.technician).length,
       uniquePOPs: Object.keys(counts.pop).length,
     };
-  }, [filteredData]);
+  }, [data, filters]);
 
   const StatCard = ({ title, value, icon: Icon, color }: any) => (
     <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center space-x-4 shadow-sm">
@@ -148,77 +247,42 @@ export function Dashboard({ data }: DashboardProps) {
     </div>
   );
 
-  const MultiSelect = ({ label, field, options }: { label: string, field: keyof typeof filters, options: ChartData[] }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const selected = filters[field];
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
-    const toggleOption = (val: string) => {
-      setFilters(prev => {
-        const current = prev[field];
-        if (current.includes(val)) {
-          return { ...prev, [field]: current.filter(x => x !== val) };
-        } else {
-          return { ...prev, [field]: [...current, val] };
-        }
-      });
-    };
+  const handleDownloadExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(filteredData.map(row => ({
+      "Số Hợp Đồng": row.contractId,
+      "KTV": row.technician,
+      "Tập Điểm (POP)": row.pop,
+      "Block": row.block,
+      "(Cấp 1)Tình trạng đầu vào": row.inputStatus,
+      "(Cấp 1)Phần tử lỗi": row.errorElement,
+      "(Cấp 1)Nguyên nhân lỗi": row.errorCause,
+      "Hướng xử lý": row.treatmentDirection
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+    XLSX.writeFile(workbook, "Bao_Cao_Chi_Tiet.xlsx");
+  };
 
-    return (
-      <div className="flex flex-col space-y-1 relative">
-        <label className="text-xs font-medium text-slate-500">{label}</label>
-        <div 
-          onClick={() => setIsOpen(!isOpen)}
-          className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 flex items-center justify-between cursor-pointer hover:border-indigo-400 transition-colors"
-        >
-          <span className="truncate pr-2">
-            {selected.length === 0 ? 'Tất cả' : `${selected.length} đã chọn`}
-          </span>
-          <ChevronDown className="w-4 h-4 text-slate-400" />
-        </div>
-        
-        {isOpen && (
-          <div className="absolute top-[60px] left-0 w-full min-w-[200px] bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto p-1">
-            <div 
-              className="px-2 py-2 hover:bg-slate-50 rounded-md cursor-pointer text-sm flex items-center text-slate-600 mb-1"
-              onClick={() => {
-                setFilters(prev => ({ ...prev, [field]: [] }));
-                setIsOpen(false);
-              }}
-            >
-              <div className="w-4 h-4 mr-2 border border-slate-300 rounded-sm flex items-center justify-center flex-shrink-0">
-                {selected.length === 0 && <Check className="w-3 h-3 text-indigo-600" />}
-              </div>
-              <span className={selected.length === 0 ? 'font-medium text-indigo-600' : ''}>Tất cả</span>
-            </div>
-            <div className="h-px bg-slate-100 my-1"></div>
-            {options.map(opt => {
-              const isSelected = selected.includes(opt.name);
-              return (
-                <div 
-                  key={opt.name}
-                  className={`px-2 py-2 hover:bg-slate-50 rounded-md cursor-pointer text-sm flex items-center justify-between ${isSelected ? 'bg-indigo-50/50' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleOption(opt.name);
-                  }}
-                >
-                  <div className="flex items-center overflow-hidden pr-2">
-                    <div className={`w-4 h-4 mr-2 border rounded-sm flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'}`}>
-                       {isSelected && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <span className="truncate text-slate-700">{opt.name}</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full flex-shrink-0">{opt.value}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {isOpen && (
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-        )}
-      </div>
-    );
+  const handleDownloadImage = async () => {
+    if (tableContainerRef.current) {
+      try {
+        const canvas = await html2canvas(tableContainerRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Bao_Cao_Chi_Tiet.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        console.error('Failed to download chart', err);
+      }
+    }
   };
 
   return (
@@ -231,13 +295,13 @@ export function Dashboard({ data }: DashboardProps) {
           <h3 className="font-medium">Bộ Lọc Dữ Liệu</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MultiSelect label="KTV" field="technician" options={filterOptions.technician} />
-          <MultiSelect label="Tập Điểm (POP)" field="pop" options={filterOptions.pop} />
-          <MultiSelect label="Block Quản Lý" field="block" options={filterOptions.block} />
-          <MultiSelect label="(Cấp 1)Tình trạng đầu vào" field="inputStatus" options={filterOptions.inputStatus} />
-          <MultiSelect label="(Cấp 1)Phần tử lỗi" field="errorElement" options={filterOptions.errorElement} />
-          <MultiSelect label="(Cấp 1)Nguyên nhân lỗi" field="errorCause" options={filterOptions.errorCause} />
-          <MultiSelect label="(Cấp 1)Hướng xử lý" field="treatmentDirection" options={filterOptions.treatmentDirection} />
+          <MultiSelect label="KTV" options={filterOptions.technician} selected={filters.technician} onChange={(val) => handleChartClick('technician', val)} onClear={() => setFilters(prev => ({...prev, technician: []}))} />
+          <MultiSelect label="Tập Điểm (POP)" options={filterOptions.pop} selected={filters.pop} onChange={(val) => handleChartClick('pop', val)} onClear={() => setFilters(prev => ({...prev, pop: []}))} />
+          <MultiSelect label="Block Quản Lý" options={filterOptions.block} selected={filters.block} onChange={(val) => handleChartClick('block', val)} onClear={() => setFilters(prev => ({...prev, block: []}))} />
+          <MultiSelect label="(Cấp 1)Tình trạng đầu vào" options={filterOptions.inputStatus} selected={filters.inputStatus} onChange={(val) => handleChartClick('inputStatus', val)} onClear={() => setFilters(prev => ({...prev, inputStatus: []}))} />
+          <MultiSelect label="(Cấp 1)Phần tử lỗi" options={filterOptions.errorElement} selected={filters.errorElement} onChange={(val) => handleChartClick('errorElement', val)} onClear={() => setFilters(prev => ({...prev, errorElement: []}))} />
+          <MultiSelect label="(Cấp 1)Nguyên nhân lỗi" options={filterOptions.errorCause} selected={filters.errorCause} onChange={(val) => handleChartClick('errorCause', val)} onClear={() => setFilters(prev => ({...prev, errorCause: []}))} />
+          <MultiSelect label="(Cấp 1)Hướng xử lý" options={filterOptions.treatmentDirection} selected={filters.treatmentDirection} onChange={(val) => handleChartClick('treatmentDirection', val)} onClear={() => setFilters(prev => ({...prev, treatmentDirection: []}))} />
         </div>
       </div>
 
@@ -256,14 +320,14 @@ export function Dashboard({ data }: DashboardProps) {
           title="Top 15 KTV xử lý nhiều lỗi nhất" 
           layout="vertical"
           onClick={(val) => handleChartClick('technician', val)}
-          activeValue={filters.technician.length === 1 ? filters.technician[0] : undefined}
+          activeValues={filters.technician}
         />
         <CustomBarChart 
           data={topPOPs} 
           title="Top 15 Tập điểm (POP) nhiều sự cố nhất" 
           layout="vertical"
           onClick={(val) => handleChartClick('pop', val)}
-          activeValue={filters.pop.length === 1 ? filters.pop[0] : undefined}
+          activeValues={filters.pop}
         />
       </div>
 
@@ -273,14 +337,14 @@ export function Dashboard({ data }: DashboardProps) {
           title="Top 15 Block quản lý" 
           layout="vertical"
           onClick={(val) => handleChartClick('block', val)}
-          activeValue={filters.block?.length === 1 ? filters.block[0] : undefined}
+          activeValues={filters.block}
         />
         <CustomBarChart 
           data={inputStatuses} 
           title="(Cấp 1)Tình trạng đầu vào" 
           layout="vertical"
           onClick={(val) => handleChartClick('inputStatus', val)}
-          activeValue={filters.inputStatus?.length === 1 ? filters.inputStatus[0] : undefined}
+          activeValues={filters.inputStatus}
         />
       </div>
 
@@ -290,14 +354,14 @@ export function Dashboard({ data }: DashboardProps) {
           title="Phần tử lỗi phổ biến" 
           layout="vertical"
           onClick={(val) => handleChartClick('errorElement', val)}
-          activeValue={filters.errorElement?.length === 1 ? filters.errorElement[0] : undefined}
+          activeValues={filters.errorElement}
         />
         <CustomBarChart 
           data={errorCauses} 
           title="Nguyên nhân lỗi" 
           layout="vertical"
           onClick={(val) => handleChartClick('errorCause', val)}
-          activeValue={filters.errorCause?.length === 1 ? filters.errorCause[0] : undefined}
+          activeValues={filters.errorCause}
         />
       </div>
 
@@ -307,7 +371,7 @@ export function Dashboard({ data }: DashboardProps) {
           title="Hướng xử lý" 
           layout="vertical"
           onClick={(val) => handleChartClick('treatmentDirection', val)}
-          activeValue={filters.treatmentDirection?.length === 1 ? filters.treatmentDirection[0] : undefined}
+          activeValues={filters.treatmentDirection}
         />
       </div>
 
@@ -320,16 +384,34 @@ export function Dashboard({ data }: DashboardProps) {
               {filteredData.length} bản ghi
             </span>
           </h3>
-          {Object.values(filters).some((arr: any) => arr.length > 0) && (
+          <div className="flex items-center space-x-2">
             <button 
-              onClick={() => setFilters({technician: [], pop: [], block: [], inputStatus: [], treatmentDirection: [], errorElement: [], errorCause: []})}
-              className="px-3 py-1 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              onClick={handleDownloadExcel}
+              className="px-3 py-1.5 flex items-center text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
+              title="Tải Excel"
             >
-              Xóa bộ lọc
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+              Excel
             </button>
-          )}
+            <button 
+              onClick={handleDownloadImage}
+              className="px-3 py-1.5 flex items-center text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors"
+              title="Tải Hình Ảnh"
+            >
+              <ImageIcon className="w-4 h-4 mr-1.5" />
+              Ảnh
+            </button>
+            {Object.values(filters).some((arr: any) => arr.length > 0) && (
+              <button 
+                onClick={() => setFilters({technician: [], pop: [], block: [], inputStatus: [], treatmentDirection: [], errorElement: [], errorCause: []})}
+                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
         </div>
-        <div className="overflow-auto flex-1 relative">
+        <div ref={tableContainerRef} className="overflow-auto flex-1 relative bg-white">
           <table className="w-full text-left text-sm text-slate-600 border-collapse whitespace-nowrap">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 sticky top-0 z-10 shadow-sm backdrop-blur-md">
               <tr>

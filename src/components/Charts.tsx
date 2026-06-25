@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -14,6 +14,8 @@ import {
   LabelList
 } from 'recharts';
 import { ChartData } from '../types';
+import { Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981', '#f43f5e', '#84cc16', '#06b6d4'];
 
@@ -33,7 +35,28 @@ const CustomTooltip = ({ active, payload, label, total }: any) => {
   return null;
 };
 
-export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name', layout = 'horizontal', yAxisWidth = 180, onClick, showPercentage = true, activeValue }: { data: ChartData[], title: string, dataKey?: string, nameKey?: string, layout?: 'horizontal' | 'vertical', yAxisWidth?: number, onClick?: (name: string) => void, showPercentage?: boolean, activeValue?: string }) => {
+const handleDownload = async (ref: React.RefObject<HTMLDivElement>, title: string) => {
+  if (ref.current) {
+    try {
+      const canvas = await html2canvas(ref.current, {
+        backgroundColor: '#ffffff',
+        scale: 2, // High resolution
+      });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to download chart', err);
+    }
+  }
+};
+
+export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name', layout = 'horizontal', yAxisWidth = 180, onClick, showPercentage = true, activeValues }: { data: ChartData[], title: string, dataKey?: string, nameKey?: string, layout?: 'horizontal' | 'vertical', yAxisWidth?: number, onClick?: (name: string) => void, showPercentage?: boolean, activeValues?: string[] }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
   const total = data.reduce((sum, item) => sum + (Number(item[dataKey as keyof ChartData]) || 0), 0);
 
   const labelFormatter = (value: number) => {
@@ -43,8 +66,17 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
   };
 
   return (
-    <div className="w-full h-[420px] bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col">
-      <h3 className="text-lg font-medium text-slate-800 mb-4 px-2">{title}</h3>
+    <div ref={chartRef} className="w-full h-[420px] bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col relative group">
+      <div className="flex items-center justify-between mb-4 px-2">
+        <h3 className="text-lg font-medium text-slate-800">{title}</h3>
+        <button 
+          onClick={(e) => { e.stopPropagation(); handleDownload(chartRef, title); }}
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+          title="Tải biểu đồ"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+      </div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -80,7 +112,7 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
                 <Cell 
                   key={`cell-${index}`} 
                   fill={COLORS[index % COLORS.length]} 
-                  opacity={activeValue ? (activeValue === entry[nameKey as keyof ChartData] ? 1 : 0.3) : 1}
+                  opacity={activeValues && activeValues.length > 0 ? (activeValues.includes(entry[nameKey as keyof ChartData] as string) ? 1 : 0.3) : 1}
                 />
               ))}
             </Bar>
@@ -91,36 +123,49 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
   );
 };
 
-export const CustomPieChart = ({ data, title, onClick }: { data: ChartData[], title: string, onClick?: (name: string) => void }) => (
-  <div className="w-full h-[420px] bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col">
-    <h3 className="text-lg font-medium text-slate-800 mb-2 px-2">{title}</h3>
-    <div className="flex-1 min-h-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={5}
-            dataKey="value"
-            onClick={(data: any) => onClick?.(data.name)}
-            style={{ cursor: onClick ? 'pointer' : 'default' }}
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip content={<CustomTooltip />} />
-          <Legend 
-            verticalAlign="bottom" 
-            height={36}
-            iconType="circle"
-            formatter={(value, entry, index) => <span className="text-slate-600 text-xs">{value}</span>}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+export const CustomPieChart = ({ data, title, onClick }: { data: ChartData[], title: string, onClick?: (name: string) => void }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  
+  return (
+    <div ref={chartRef} className="w-full h-[420px] bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col relative group">
+      <div className="flex items-center justify-between mb-2 px-2">
+        <h3 className="text-lg font-medium text-slate-800">{title}</h3>
+        <button 
+          onClick={(e) => { e.stopPropagation(); handleDownload(chartRef, title); }}
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+          title="Tải biểu đồ"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="flex-1 min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={80}
+              paddingAngle={5}
+              dataKey="value"
+              onClick={(data: any) => onClick?.(data.name)}
+              style={{ cursor: onClick ? 'pointer' : 'default' }}
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+            <Legend 
+              verticalAlign="bottom" 
+              height={36}
+              iconType="circle"
+              formatter={(value, entry, index) => <span className="text-slate-600 text-xs">{value}</span>}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
-  </div>
-);
+  );
+};

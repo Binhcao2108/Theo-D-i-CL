@@ -252,7 +252,7 @@ export function Dashboard({ data }: DashboardProps) {
         const source = item.sourceFile;
         const val = item[field] as string;
         
-        if (val) {
+        if (val && val !== 'N/A' && val.toString().trim() !== '') {
           sourceCounts[source][val] = (sourceCounts[source][val] || 0) + 1;
         }
 

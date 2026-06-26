@@ -248,6 +248,7 @@ export function Dashboard({ data }: DashboardProps) {
   );
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const chartsContainerRef = useRef<HTMLDivElement>(null);
 
   const handleDownloadExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(filteredData.map(row => ({
@@ -266,15 +267,15 @@ export function Dashboard({ data }: DashboardProps) {
   };
 
   const handleDownloadImage = async () => {
-    if (tableContainerRef.current) {
+    if (chartsContainerRef.current) {
       try {
-        const url = await toPng(tableContainerRef.current, {
-          backgroundColor: '#ffffff',
-          pixelRatio: 2,
+        const url = await toPng(chartsContainerRef.current, {
+          backgroundColor: '#f8fafc', // match typical background
+          pixelRatio: 1, // standard resolution to keep it light
         });
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Bao_Cao_Chi_Tiet.png`;
+        a.download = `Bieu_Do_Bao_Cao.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -313,65 +314,67 @@ export function Dashboard({ data }: DashboardProps) {
       </div>
 
       {/* Main Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
-        <CustomBarChart 
-          data={topKTVs} 
-          title="Top 15 KTV xử lý nhiều lỗi nhất" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('technician', val)}
-          activeValues={filters.technician}
-        />
-        <CustomBarChart 
-          data={topPOPs} 
-          title="Top 15 Tập điểm (POP) nhiều sự cố nhất" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('pop', val)}
-          activeValues={filters.pop}
-        />
-      </div>
+      <div ref={chartsContainerRef} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+          <CustomBarChart 
+            data={topKTVs} 
+            title="Top 15 KTV xử lý nhiều lỗi nhất" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('technician', val)}
+            activeValues={filters.technician}
+          />
+          <CustomBarChart 
+            data={topPOPs} 
+            title="Top 15 Tập điểm (POP) nhiều sự cố nhất" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('pop', val)}
+            activeValues={filters.pop}
+          />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
-        <CustomBarChart 
-          data={topBlocks} 
-          title="Top 15 Block quản lý" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('block', val)}
-          activeValues={filters.block}
-        />
-        <CustomBarChart 
-          data={inputStatuses} 
-          title="(Cấp 1)Tình trạng đầu vào" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('inputStatus', val)}
-          activeValues={filters.inputStatus}
-        />
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+          <CustomBarChart 
+            data={topBlocks} 
+            title="Top 15 Block quản lý" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('block', val)}
+            activeValues={filters.block}
+          />
+          <CustomBarChart 
+            data={inputStatuses} 
+            title="(Cấp 1)Tình trạng đầu vào" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('inputStatus', val)}
+            activeValues={filters.inputStatus}
+          />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
-        <CustomBarChart 
-          data={errorElements} 
-          title="Phần tử lỗi phổ biến" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('errorElement', val)}
-          activeValues={filters.errorElement}
-        />
-        <CustomBarChart 
-          data={errorCauses} 
-          title="Nguyên nhân lỗi" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('errorCause', val)}
-          activeValues={filters.errorCause}
-        />
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+          <CustomBarChart 
+            data={errorElements} 
+            title="Phần tử lỗi phổ biến" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('errorElement', val)}
+            activeValues={filters.errorElement}
+          />
+          <CustomBarChart 
+            data={errorCauses} 
+            title="Nguyên nhân lỗi" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('errorCause', val)}
+            activeValues={filters.errorCause}
+          />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
-        <CustomBarChart 
-          data={treatmentDirections} 
-          title="Hướng xử lý" 
-          layout="vertical"
-          onClick={(val) => handleChartClick('treatmentDirection', val)}
-          activeValues={filters.treatmentDirection}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+          <CustomBarChart 
+            data={treatmentDirections} 
+            title="Hướng xử lý" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('treatmentDirection', val)}
+            activeValues={filters.treatmentDirection}
+          />
+        </div>
       </div>
 
       {/* Detail Table */}

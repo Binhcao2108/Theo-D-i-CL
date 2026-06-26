@@ -65,9 +65,9 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
   };
 
   return (
-    <div ref={chartRef} className="w-full h-[420px] bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col relative group">
+    <div ref={chartRef} className="w-full h-[420px] bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col relative group">
       <div className="flex items-center justify-between mb-4 px-2">
-        <h3 className="text-lg font-medium text-slate-800">{title}</h3>
+        <h3 className="text-lg font-display font-semibold text-slate-800 tracking-tight">{title}</h3>
         <button 
           onClick={(e) => { e.stopPropagation(); handleDownload(chartRef, title); }}
           className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
@@ -115,6 +115,76 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
                 />
               ))}
             </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+
+export const ComparisonBarChart = ({ data, title, keys, sourceTotals }: { data: any[], title: string, keys: string[], sourceTotals?: Record<string, number> }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+
+  const CustomLabel = (props: any) => {
+    const { x, y, width, value, dataKey } = props;
+    if (!value) return null;
+    const total = sourceTotals ? sourceTotals[dataKey] : 0;
+    const percent = total ? ((value / total) * 100).toFixed(1) : 0;
+    
+    return (
+      <text x={x + width / 2} y={y - 5} fill="#64748b" textAnchor="middle" fontSize={10}>
+        {value} ({percent}%)
+      </text>
+    );
+  };
+
+  return (
+    <div ref={chartRef} className="w-full h-[420px] bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col relative group">
+      <div className="flex items-center justify-between mb-4 px-2">
+        <h3 className="text-lg font-display font-semibold text-slate-800 tracking-tight">{title}</h3>
+        <button 
+          onClick={(e) => { e.stopPropagation(); handleDownload(chartRef, title); }}
+          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+          title="Tải biểu đồ"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="flex-1 min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+            <XAxis 
+              dataKey="name" 
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#64748b', fontSize: 12 }}
+              interval={0}
+              angle={-45}
+              textAnchor="end"
+              height={60}
+            />
+            <YAxis 
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#64748b', fontSize: 12 }}
+            />
+            <Tooltip 
+              contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+              cursor={{ fill: '#f8fafc' }}
+            />
+            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+            {keys.map((key, index) => (
+              <Bar 
+                key={key} 
+                dataKey={key} 
+                fill={COLORS[index % COLORS.length]} 
+                radius={[4, 4, 0, 0]} 
+                maxBarSize={40}
+              >
+                {sourceTotals && <LabelList dataKey={key} content={(props) => <CustomLabel {...props} dataKey={key} />} />}
+              </Bar>
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -3,11 +3,11 @@ import { UploadCloud, FileSpreadsheet } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface FileUploadProps {
-  onFileSelect: (file: File) => void;
+  onFilesSelect: (files: File[]) => void;
   isLoading?: boolean;
 }
 
-export function FileUpload({ onFileSelect, isLoading }: FileUploadProps) {
+export function FileUpload({ onFilesSelect, isLoading }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -26,22 +26,32 @@ export function FileUpload({ onFileSelect, isLoading }: FileUploadProps) {
       e.stopPropagation();
       setIsDragging(false);
 
-      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        const file = e.dataTransfer.files[0];
-        if (file.name.match(/\.(xlsx|xls|csv)$/i)) {
-          onFileSelect(file);
-        } else {
-          alert('Vui lòng chọn file Excel (.xlsx, .xls, .csv)');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const validFiles = Array.from(e.dataTransfer.files).filter(file => 
+          file.name.match(/\.(xlsx|xls|csv)$/i)
+        );
+        
+        if (validFiles.length > 0) {
+          onFilesSelect(validFiles);
+        }
+        
+        if (validFiles.length !== e.dataTransfer.files.length) {
+          alert('Một số file không được hỗ trợ. Vui lòng chọn file Excel (.xlsx, .xls, .csv)');
         }
       }
     },
-    [onFileSelect]
+    [onFilesSelect]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      onFileSelect(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const validFiles = Array.from(e.target.files).filter(file => 
+        file.name.match(/\.(xlsx|xls|csv)$/i)
+      );
+      if (validFiles.length > 0) {
+        onFilesSelect(validFiles);
+      }
     }
   };
 
@@ -64,10 +74,10 @@ export function FileUpload({ onFileSelect, isLoading }: FileUploadProps) {
         <div className="p-4 bg-indigo-50 rounded-full mb-4 shadow-sm group-hover:scale-110 transition-transform duration-300 ring-1 ring-indigo-100">
           <UploadCloud className={cn("w-10 h-10 text-indigo-500", isLoading && "animate-pulse")} />
         </div>
-        <h3 className="text-xl font-medium text-slate-800 mb-2">
+        <h3 className="text-xl font-display font-semibold text-slate-800 mb-2 tracking-tight">
           {isLoading ? 'Đang xử lý...' : 'Tải lên dữ liệu KTV'}
         </h3>
-        <p className="text-sm text-slate-500 max-w-xs">
+        <p className="text-sm text-slate-500 max-w-xs font-medium">
           Kéo thả file Excel hoặc click để chọn file (.xlsx, .xls, .csv)
         </p>
       </div>
@@ -78,6 +88,7 @@ export function FileUpload({ onFileSelect, isLoading }: FileUploadProps) {
         accept=".xlsx, .xls, .csv"
         onChange={handleChange}
         disabled={isLoading}
+        multiple
       />
     </div>
   );

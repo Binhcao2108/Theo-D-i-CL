@@ -7,6 +7,7 @@ export interface TicketRecord {
   errorElement: string;
   errorCause: string;
   treatmentDirection: string;
+  sourceFile?: string;
 }
 
 export interface ColumnMapping {

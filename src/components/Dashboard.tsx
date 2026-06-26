@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { TicketRecord, ChartData } from '../types';
-import { CustomBarChart } from './Charts';
+import { CustomBarChart, ComparisonBarChart } from './Charts';
 import { Users, AlertTriangle, Activity, Database, Filter, Check, ChevronDown, Search, Download, FileSpreadsheet, Image as ImageIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toPng } from 'html-to-image';
@@ -147,7 +147,8 @@ export function Dashboard({ data }: DashboardProps) {
     errorElements,
     errorCauses,
     uniqueKTVs,
-    uniquePOPs
+    uniquePOPs,
+    sources
   } = useMemo(() => {
     // Pre-convert arrays to Sets for O(1) lookups
     const filterSets = {
@@ -232,17 +233,75 @@ export function Dashboard({ data }: DashboardProps) {
       errorCauses: errorCauseOptions.slice(0, 15),
       uniqueKTVs: Object.keys(counts.technician).length,
       uniquePOPs: Object.keys(counts.pop).length,
+      sources: Array.from(new Set(resultFilteredData.map(d => d.sourceFile).filter(Boolean))) as string[],
     };
   }, [data, filters]);
 
+  const comparisonData = useMemo(() => {
+    if (sources.length <= 1) return null;
+    
+    const getTopComparisons = (field: keyof TicketRecord, options: { name: string, value: number }[]) => {
+      const topItems = options.slice(0, 5).map(c => c.name);
+      const map: Record<string, Record<string, number>> = {};
+      
+      const sourceCounts: Record<string, Record<string, number>> = {};
+      sources.forEach(s => sourceCounts[s] = {});
+      
+      filteredData.forEach(item => {
+        if (!item.sourceFile) return;
+        const source = item.sourceFile;
+        const val = item[field] as string;
+        
+        if (val) {
+          sourceCounts[source][val] = (sourceCounts[source][val] || 0) + 1;
+        }
+
+        if (val && topItems.includes(val)) {
+          if (!map[val]) {
+            map[val] = {};
+            sources.forEach(s => map[val][s] = 0);
+          }
+          map[val][source] += 1;
+        }
+      });
+
+      const sourceTotals: Record<string, number> = {};
+      sources.forEach(source => {
+        const sortedCounts = Object.entries(sourceCounts[source])
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 15);
+        sourceTotals[source] = sortedCounts.reduce((sum, [_, count]) => sum + count, 0);
+      });
+
+      const data = topItems.map(item => ({
+        name: item,
+        ...(map[item] || sources.reduce((acc, s) => ({...acc, [s]: 0}), {}))
+      }));
+      
+      return { data, sourceTotals };
+    };
+
+    const causeComparison = getTopComparisons('errorCause', errorCauses);
+    const inputStatusComparison = getTopComparisons('inputStatus', inputStatuses);
+    const errorElementComparison = getTopComparisons('errorElement', errorElements);
+    const treatmentComparison = getTopComparisons('treatmentDirection', treatmentDirections);
+    
+    return { 
+      causeComparison, 
+      inputStatusComparison, 
+      errorElementComparison, 
+      treatmentComparison
+    };
+  }, [filteredData, sources, errorCauses, inputStatuses, errorElements, treatmentDirections]);
+
   const StatCard = ({ title, value, icon: Icon, color }: any) => (
-    <div className="bg-white border border-slate-200 rounded-xl p-6 flex items-center space-x-4 shadow-sm">
-      <div className={`p-3 rounded-lg bg-${color}-50 text-${color}-600`}>
+    <div className="bg-white border border-slate-200/60 rounded-2xl p-6 flex items-center space-x-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+      <div className={`p-3.5 rounded-xl bg-${color}-50 text-${color}-600 ring-1 ring-inset ring-${color}-500/10`}>
         <Icon className="w-6 h-6" />
       </div>
       <div>
-        <p className="text-sm font-medium text-slate-500">{title}</p>
-        <p className="text-2xl font-bold text-slate-900">{value}</p>
+        <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
+        <p className="text-3xl font-display font-bold text-slate-900 tracking-tight">{value}</p>
       </div>
     </div>
   );
@@ -313,8 +372,78 @@ export function Dashboard({ data }: DashboardProps) {
         <StatCard title="Nguyên nhân lỗi" value={errorCauses.length} icon={AlertTriangle} color="rose" />
       </div>
 
+      {/* Comparison Charts */}
+      {comparisonData && (
+        <div className="space-y-6 mb-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <h2 className="text-2xl font-display font-bold text-slate-800 tracking-tight">So Sánh Giữa Các File / Tháng</h2>
+            <div className="flex-1 h-px bg-slate-200"></div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+            <ComparisonBarChart 
+              data={comparisonData.inputStatusComparison.data} 
+              title="Top 5 Tình Trạng Đầu Vào" 
+              keys={sources} 
+              sourceTotals={comparisonData.inputStatusComparison.sourceTotals}
+            />
+            <ComparisonBarChart 
+              data={comparisonData.errorElementComparison.data} 
+              title="Top 5 Phần Tử Lỗi" 
+              keys={sources} 
+              sourceTotals={comparisonData.errorElementComparison.sourceTotals}
+            />
+            <ComparisonBarChart 
+              data={comparisonData.causeComparison.data} 
+              title="Top 5 Nguyên Nhân Lỗi" 
+              keys={sources} 
+              sourceTotals={comparisonData.causeComparison.sourceTotals}
+            />
+            <ComparisonBarChart 
+              data={comparisonData.treatmentComparison.data} 
+              title="Top 5 Hướng Xử Lý" 
+              keys={sources} 
+              sourceTotals={comparisonData.treatmentComparison.sourceTotals}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Main Charts */}
       <div ref={chartsContainerRef} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+          <CustomBarChart 
+            data={inputStatuses} 
+            title="(Cấp 1)Tình trạng đầu vào" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('inputStatus', val)}
+            activeValues={filters.inputStatus}
+          />
+          <CustomBarChart 
+            data={errorElements} 
+            title="Phần tử lỗi phổ biến" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('errorElement', val)}
+            activeValues={filters.errorElement}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+          <CustomBarChart 
+            data={errorCauses} 
+            title="Nguyên nhân lỗi" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('errorCause', val)}
+            activeValues={filters.errorCause}
+          />
+          <CustomBarChart 
+            data={treatmentDirections} 
+            title="Hướng xử lý" 
+            layout="vertical"
+            onClick={(val) => handleChartClick('treatmentDirection', val)}
+            activeValues={filters.treatmentDirection}
+          />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
           <CustomBarChart 
             data={topKTVs} 
@@ -340,56 +469,22 @@ export function Dashboard({ data }: DashboardProps) {
             onClick={(val) => handleChartClick('block', val)}
             activeValues={filters.block}
           />
-          <CustomBarChart 
-            data={inputStatuses} 
-            title="(Cấp 1)Tình trạng đầu vào" 
-            layout="vertical"
-            onClick={(val) => handleChartClick('inputStatus', val)}
-            activeValues={filters.inputStatus}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
-          <CustomBarChart 
-            data={errorElements} 
-            title="Phần tử lỗi phổ biến" 
-            layout="vertical"
-            onClick={(val) => handleChartClick('errorElement', val)}
-            activeValues={filters.errorElement}
-          />
-          <CustomBarChart 
-            data={errorCauses} 
-            title="Nguyên nhân lỗi" 
-            layout="vertical"
-            onClick={(val) => handleChartClick('errorCause', val)}
-            activeValues={filters.errorCause}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
-          <CustomBarChart 
-            data={treatmentDirections} 
-            title="Hướng xử lý" 
-            layout="vertical"
-            onClick={(val) => handleChartClick('treatmentDirection', val)}
-            activeValues={filters.treatmentDirection}
-          />
         </div>
       </div>
 
       {/* Detail Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[600px] relative z-10">
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
-          <h3 className="font-medium text-slate-800 flex items-center">
+      <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[600px] relative z-10">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50 sticky top-0 z-10">
+          <h3 className="text-lg font-display font-semibold text-slate-800 flex items-center tracking-tight">
             Chi Tiết Dữ Liệu
-            <span className="ml-2 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md text-sm">
+            <span className="ml-3 px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-md text-xs font-medium font-sans">
               {filteredData.length} bản ghi
             </span>
           </h3>
           <div className="flex items-center space-x-2">
             <button 
               onClick={handleDownloadExcel}
-              className="px-3 py-1.5 flex items-center text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
+              className="px-3 py-1.5 flex items-center text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 rounded-lg transition-colors"
               title="Tải Excel"
             >
               <FileSpreadsheet className="w-4 h-4 mr-1.5" />
@@ -397,7 +492,7 @@ export function Dashboard({ data }: DashboardProps) {
             </button>
             <button 
               onClick={handleDownloadImage}
-              className="px-3 py-1.5 flex items-center text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors"
+              className="px-3 py-1.5 flex items-center text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/60 rounded-lg transition-colors"
               title="Tải Hình Ảnh"
             >
               <ImageIcon className="w-4 h-4 mr-1.5" />
@@ -406,7 +501,7 @@ export function Dashboard({ data }: DashboardProps) {
             {Object.values(filters).some((arr: any) => arr.length > 0) && (
               <button 
                 onClick={() => setFilters({technician: [], pop: [], block: [], inputStatus: [], treatmentDirection: [], errorElement: [], errorCause: []})}
-                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200/60 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
               >
                 Xóa bộ lọc
               </button>
@@ -417,21 +512,21 @@ export function Dashboard({ data }: DashboardProps) {
           <table className="w-full text-left text-sm text-slate-600 border-collapse whitespace-nowrap">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 sticky top-0 z-10 shadow-sm backdrop-blur-md">
               <tr>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Số Hợp Đồng</th>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">KTV</th>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Tập Điểm (POP)</th>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Block</th>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">(Cấp 1)Tình trạng đầu vào</th>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">(Cấp 1)Phần tử lỗi</th>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">(Cấp 1)Nguyên nhân lỗi</th>
-                <th className="px-6 py-3 border-b border-slate-200 font-semibold">Hướng xử lý</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">Số Hợp Đồng</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">KTV</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">Tập Điểm (POP)</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">Block</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">(Cấp 1)Tình trạng đầu vào</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">(Cấp 1)Phần tử lỗi</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">(Cấp 1)Nguyên nhân lỗi</th>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">Hướng xử lý</th>
               </tr>
             </thead>
             <tbody>
               {filteredData.length > 0 ? filteredData.map((row, i) => (
-                <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4">{row.contractId}</td>
-                  <td className="px-6 py-4">{row.technician}</td>
+                <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs">{row.contractId}</td>
+                  <td className="px-6 py-4 font-medium text-slate-700">{row.technician}</td>
                   <td className="px-6 py-4">{row.pop}</td>
                   <td className="px-6 py-4">{row.block}</td>
                   <td className="px-6 py-4">{row.inputStatus}</td>
@@ -452,10 +547,11 @@ export function Dashboard({ data }: DashboardProps) {
       </div>
 
       {/* AI Insights Section */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-slate-800 flex items-center">
-            <span className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center mr-3">
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-fuchsia-500 to-indigo-500"></div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+          <h3 className="text-xl font-display font-semibold text-slate-800 flex items-center tracking-tight">
+            <span className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mr-3 ring-1 ring-inset ring-purple-500/10 shadow-sm">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             </span>
             Nhận Định Bằng AI
@@ -466,7 +562,7 @@ export function Dashboard({ data }: DashboardProps) {
               const btn = document.getElementById('ai-analyze-btn');
               try {
                 if (btn) btn.textContent = 'Đang phân tích...';
-                if (contentDiv) contentDiv.innerHTML = '<div class="flex items-center justify-center text-slate-500"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Đang tải nhận định...</div>';
+                if (contentDiv) contentDiv.innerHTML = '<div class="flex items-center justify-center text-slate-500 py-8"><svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span class="font-medium text-purple-700">AI đang xử lý dữ liệu...</span></div>';
                 
                 const response = await fetch('/api/analyze', {
                   method: 'POST',
@@ -484,32 +580,35 @@ export function Dashboard({ data }: DashboardProps) {
                 const result = await response.json();
                 if (contentDiv) {
                   if (response.ok) {
-                    contentDiv.innerHTML = '<div class="prose prose-sm max-w-none text-slate-700 space-y-2">' + 
+                    contentDiv.innerHTML = '<div class="prose prose-slate max-w-none space-y-3 leading-relaxed">' + 
                       result.result.split('\n').map((line: string) => {
                         const trimmed = line.trim();
-                        if (trimmed.startsWith('-') || trimmed.startsWith('*')) return `<li class="ml-4">${trimmed.substring(1).trim()}</li>`;
-                        if (trimmed.startsWith('**') && trimmed.endsWith('**')) return `<p class="font-semibold text-slate-800 mt-3">${trimmed.replace(/\*\*/g, '')}</p>`;
+                        if (trimmed.startsWith('-') || trimmed.startsWith('*')) return `<li class="ml-4 pl-1 marker:text-purple-500">${trimmed.substring(1).trim()}</li>`;
+                        if (trimmed.startsWith('**') && trimmed.endsWith('**')) return `<h4 class="font-display font-semibold text-slate-900 mt-4 text-lg">${trimmed.replace(/\*\*/g, '')}</h4>`;
                         if (trimmed === '') return '';
-                        return `<p>${trimmed}</p>`;
+                        return `<p class="text-slate-600">${trimmed}</p>`;
                       }).join('') + '</div>';
                   } else {
-                    contentDiv.innerHTML = `<div class="text-red-500">${result.error}</div>`;
+                    contentDiv.innerHTML = `<div class="text-rose-500 font-medium flex items-center"><AlertTriangle class="w-5 h-5 mr-2"/> ${result.error}</div>`;
                   }
                 }
               } catch (e: any) {
-                if (contentDiv) contentDiv.innerHTML = `<div class="text-red-500">Lỗi kết nối tới máy chủ AI.</div>`;
+                if (contentDiv) contentDiv.innerHTML = `<div class="text-rose-500 font-medium">Lỗi kết nối tới máy chủ AI. Vui lòng thử lại.</div>`;
               } finally {
                 if (btn) btn.textContent = 'Phân Tích Dữ Liệu';
               }
             }}
             id="ai-analyze-btn"
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm flex items-center cursor-pointer"
+            className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm font-medium rounded-xl transition-all shadow-md hover:shadow-lg flex items-center cursor-pointer transform hover:-translate-y-0.5"
           >
             Phân Tích Dữ Liệu
           </button>
         </div>
-        <div id="ai-insight-content" className="p-4 bg-slate-50 rounded-lg border border-slate-100 min-h-[100px] text-slate-600 text-sm flex items-center justify-center">
-          Nhấn nút "Phân Tích Dữ Liệu" để AI tổng hợp và đưa ra nhận định từ dữ liệu đang hiển thị.
+        <div id="ai-insight-content" className="p-6 bg-slate-50/50 rounded-xl border border-slate-200/60 min-h-[140px] text-slate-500 text-sm flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-base text-slate-600 mb-2 font-medium">Sẵn sàng phân tích</p>
+            <p>Nhấn nút "Phân Tích Dữ Liệu" để AI tổng hợp và đưa ra nhận định từ dữ liệu đang hiển thị.</p>
+          </div>
         </div>
       </div>
     </div>

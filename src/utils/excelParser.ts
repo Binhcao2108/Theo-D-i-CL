@@ -40,7 +40,7 @@ export const parseExcelFile = async (file: File): Promise<{ data: TicketRecord[]
         const headers = Object.keys(jsonData[0] as object);
 
         const mapping: ColumnMapping = {
-          contractId: matchColumn(headers, ['số hợp đồng', 'so hop dong', 'khách hàng', 'khach hang', 'account', 'hợp đồng']),
+          contractId: matchColumn(headers, ['số hđ', 'so hd', 'số hợp đồng', 'so hop dong', 'account', 'hợp đồng']),
           technician: matchColumn(headers, ['nhân viên', 'nhan vien', 'ktv', 'kỹ thuật', 'ky thuat', 'người xử lý', 'nguoi xu ly']),
           pop: matchColumn(headers, ['tập điểm', 'tap diem', 'pop']),
           block: matchColumn(headers, ['block', 'block quản lý', 'block quan ly']),

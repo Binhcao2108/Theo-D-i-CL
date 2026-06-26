@@ -3,7 +3,7 @@ import { TicketRecord, ChartData } from '../types';
 import { CustomBarChart } from './Charts';
 import { Users, AlertTriangle, Activity, Database, Filter, Check, ChevronDown, Search, Download, FileSpreadsheet, Image as ImageIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 interface DashboardProps {
   data: TicketRecord[];
@@ -268,11 +268,10 @@ export function Dashboard({ data }: DashboardProps) {
   const handleDownloadImage = async () => {
     if (tableContainerRef.current) {
       try {
-        const canvas = await html2canvas(tableContainerRef.current, {
+        const url = await toPng(tableContainerRef.current, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          pixelRatio: 2,
         });
-        const url = canvas.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = url;
         a.download = `Bao_Cao_Chi_Tiet.png`;
@@ -446,6 +445,68 @@ export function Dashboard({ data }: DashboardProps) {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* AI Insights Section */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-slate-800 flex items-center">
+            <span className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center mr-3">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </span>
+            Nhận Định Bằng AI
+          </h3>
+          <button 
+            onClick={async () => {
+              const contentDiv = document.getElementById('ai-insight-content');
+              const btn = document.getElementById('ai-analyze-btn');
+              try {
+                if (btn) btn.textContent = 'Đang phân tích...';
+                if (contentDiv) contentDiv.innerHTML = '<div class="flex items-center justify-center text-slate-500"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Đang tải nhận định...</div>';
+                
+                const response = await fetch('/api/analyze', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    dataSummary: {
+                      totalRecords: filteredData.length,
+                      topCauses: errorCauses,
+                      topElements: errorElements,
+                      topBlocks: topBlocks
+                    }
+                  })
+                });
+                
+                const result = await response.json();
+                if (contentDiv) {
+                  if (response.ok) {
+                    contentDiv.innerHTML = '<div class="prose prose-sm max-w-none text-slate-700 space-y-2">' + 
+                      result.result.split('\n').map((line: string) => {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith('-') || trimmed.startsWith('*')) return `<li class="ml-4">${trimmed.substring(1).trim()}</li>`;
+                        if (trimmed.startsWith('**') && trimmed.endsWith('**')) return `<p class="font-semibold text-slate-800 mt-3">${trimmed.replace(/\*\*/g, '')}</p>`;
+                        if (trimmed === '') return '';
+                        return `<p>${trimmed}</p>`;
+                      }).join('') + '</div>';
+                  } else {
+                    contentDiv.innerHTML = `<div class="text-red-500">${result.error}</div>`;
+                  }
+                }
+              } catch (e: any) {
+                if (contentDiv) contentDiv.innerHTML = `<div class="text-red-500">Lỗi kết nối tới máy chủ AI.</div>`;
+              } finally {
+                if (btn) btn.textContent = 'Phân Tích Dữ Liệu';
+              }
+            }}
+            id="ai-analyze-btn"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm flex items-center cursor-pointer"
+          >
+            Phân Tích Dữ Liệu
+          </button>
+        </div>
+        <div id="ai-insight-content" className="p-4 bg-slate-50 rounded-lg border border-slate-100 min-h-[100px] text-slate-600 text-sm flex items-center justify-center">
+          Nhấn nút "Phân Tích Dữ Liệu" để AI tổng hợp và đưa ra nhận định từ dữ liệu đang hiển thị.
         </div>
       </div>
     </div>

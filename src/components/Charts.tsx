@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import { ChartData } from '../types';
 import { Download } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981', '#f43f5e', '#84cc16', '#06b6d4'];
 
@@ -38,11 +38,10 @@ const CustomTooltip = ({ active, payload, label, total }: any) => {
 const handleDownload = async (ref: React.RefObject<HTMLDivElement>, title: string) => {
   if (ref.current) {
     try {
-      const canvas = await html2canvas(ref.current, {
+      const url = await toPng(ref.current, {
         backgroundColor: '#ffffff',
-        scale: 2, // High resolution
+        pixelRatio: 2, // High resolution
       });
-      const url = canvas.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url;
       a.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;

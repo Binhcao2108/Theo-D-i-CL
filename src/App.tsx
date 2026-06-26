@@ -15,8 +15,23 @@ interface FileData {
 export default function App() {
   const [filesData, setFilesData] = useState<FileData[]>([]);
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTabName, setEditingTabName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleTabRename = (id: string, newName: string) => {
+    if (newName.trim()) {
+      setFilesData(prev => prev.map(f => {
+        if (f.id === id) {
+          const updatedData = f.data.map(item => ({...item, sourceFile: newName.trim()}));
+          return { ...f, name: newName.trim(), data: updatedData };
+        }
+        return f;
+      }));
+    }
+    setEditingTabId(null);
+  };
 
   const handleFilesSelect = async (files: File[]) => {
     setIsLoading(true);
@@ -132,18 +147,41 @@ export default function App() {
             {filesData.length > 1 && (
               <div className="flex items-center space-x-1 overflow-x-auto pb-0 border-b border-slate-200/80 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {filesData.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setActiveTab(f.id)}
-                    className={cn(
-                      "px-5 py-3 text-sm font-display font-medium rounded-t-xl transition-all whitespace-nowrap -mb-px border-b-2",
-                      activeTab === f.id
-                        ? "text-indigo-600 border-indigo-600 bg-indigo-50/80"
-                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50 border-transparent"
+                  <div key={f.id} className="relative group">
+                    {editingTabId === f.id ? (
+                      <input
+                        autoFocus
+                        value={editingTabName}
+                        onChange={(e) => setEditingTabName(e.target.value)}
+                        onBlur={() => handleTabRename(f.id, editingTabName)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleTabRename(f.id, editingTabName);
+                          if (e.key === 'Escape') setEditingTabId(null);
+                        }}
+                        className={cn(
+                          "px-5 py-3 text-sm font-display font-medium rounded-t-xl transition-all w-32 outline-none border-b-2",
+                          "text-indigo-600 border-indigo-600 bg-indigo-50/80"
+                        )}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setActiveTab(f.id)}
+                        onDoubleClick={() => {
+                          setEditingTabId(f.id);
+                          setEditingTabName(f.name);
+                        }}
+                        title="Click đúp để đổi tên tab"
+                        className={cn(
+                          "px-5 py-3 text-sm font-display font-medium rounded-t-xl transition-all whitespace-nowrap -mb-px border-b-2",
+                          activeTab === f.id
+                            ? "text-indigo-600 border-indigo-600 bg-indigo-50/80"
+                            : "text-slate-500 hover:text-slate-800 hover:bg-slate-50 border-transparent"
+                        )}
+                      >
+                        {f.name}
+                      </button>
                     )}
-                  >
-                    {f.name}
-                  </button>
+                  </div>
                 ))}
                 <button
                   onClick={() => setActiveTab('all')}

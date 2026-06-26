@@ -58,10 +58,14 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
   const chartRef = useRef<HTMLDivElement>(null);
   const total = data.reduce((sum, item) => sum + (Number(item[dataKey as keyof ChartData]) || 0), 0);
 
-  const labelFormatter = (value: number) => {
-    if (!showPercentage || total === 0) return value;
+  const percentFormatter = (value: number) => {
+    if (!showPercentage || total === 0) return '';
     const percent = ((value / total) * 100).toFixed(1);
-    return `${value} (${percent}%)`;
+    return `${percent}%`;
+  };
+
+  const valueFormatter = (value: number) => {
+    return value;
   };
 
   return (
@@ -81,7 +85,7 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
           <BarChart
             data={data}
             layout={layout}
-            margin={{ top: 15, right: 20, left: 20, bottom: 5 }}
+            margin={{ top: 15, right: 30, left: 20, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={layout === 'horizontal'} vertical={layout === 'vertical'} />
             {layout === 'horizontal' ? (
@@ -106,7 +110,8 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
                 }
               }}
             >
-              <LabelList dataKey={dataKey} position={layout === 'vertical' ? 'insideRight' : 'insideTop'} fill="#ffffff" fontSize={11} formatter={labelFormatter} />
+              {showPercentage && <LabelList dataKey={dataKey} position={layout === 'vertical' ? 'insideRight' : 'insideTop'} fill="#ffffff" fontSize={11} formatter={percentFormatter} />}
+              <LabelList dataKey={dataKey} position={layout === 'vertical' ? 'right' : 'top'} fill="#64748b" fontSize={11} formatter={valueFormatter} />
               {data.map((entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 
@@ -125,15 +130,26 @@ export const CustomBarChart = ({ data, title, dataKey = 'value', nameKey = 'name
 export const ComparisonBarChart = ({ data, title, keys, sourceTotals }: { data: any[], title: string, keys: string[], sourceTotals?: Record<string, number> }) => {
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const CustomLabel = (props: any) => {
-    const { x, y, width, value, dataKey } = props;
-    if (!value) return null;
+  const CustomLabelInside = (props: any) => {
+    const { x, y, width, height, value, dataKey } = props;
+    if (!value || height < 15) return null;
     const total = sourceTotals ? sourceTotals[dataKey] : 0;
     const percent = total ? ((value / total) * 100).toFixed(1) : 0;
     
     return (
+      <text x={x + width / 2} y={y + 14} fill="#ffffff" textAnchor="middle" fontSize={10} fontWeight={500}>
+        {percent}%
+      </text>
+    );
+  };
+
+  const CustomLabelOutside = (props: any) => {
+    const { x, y, width, value } = props;
+    if (!value) return null;
+    
+    return (
       <text x={x + width / 2} y={y - 5} fill="#64748b" textAnchor="middle" fontSize={10}>
-        {value} ({percent}%)
+        {value}
       </text>
     );
   };
@@ -182,7 +198,8 @@ export const ComparisonBarChart = ({ data, title, keys, sourceTotals }: { data: 
                 radius={[4, 4, 0, 0]} 
                 maxBarSize={40}
               >
-                {sourceTotals && <LabelList dataKey={key} content={(props) => <CustomLabel {...props} dataKey={key} />} />}
+                {sourceTotals && <LabelList dataKey={key} content={(props) => <CustomLabelInside {...props} dataKey={key} />} />}
+                {sourceTotals && <LabelList dataKey={key} content={(props) => <CustomLabelOutside {...props} dataKey={key} />} />}
               </Bar>
             ))}
           </BarChart>

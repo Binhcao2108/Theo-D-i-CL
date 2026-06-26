@@ -27,12 +27,12 @@ export function FileUpload({ onFilesSelect, isLoading }: FileUploadProps) {
       setIsDragging(false);
 
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const validFiles = Array.from(e.dataTransfer.files).filter(file => 
+        const validFiles = Array.from(e.dataTransfer.files).filter((file: File) => 
           file.name.match(/\.(xlsx|xls|csv)$/i)
         );
         
         if (validFiles.length > 0) {
-          onFilesSelect(validFiles);
+          onFilesSelect(validFiles as File[]);
         }
         
         if (validFiles.length !== e.dataTransfer.files.length) {
@@ -46,11 +46,11 @@ export function FileUpload({ onFilesSelect, isLoading }: FileUploadProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     if (e.target.files && e.target.files.length > 0) {
-      const validFiles = Array.from(e.target.files).filter(file => 
+      const validFiles = Array.from(e.target.files).filter((file: File) => 
         file.name.match(/\.(xlsx|xls|csv)$/i)
       );
       if (validFiles.length > 0) {
-        onFilesSelect(validFiles);
+        onFilesSelect(validFiles as File[]);
       }
     }
   };

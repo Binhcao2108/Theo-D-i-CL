@@ -7,6 +7,7 @@ import { toPng } from 'html-to-image';
 
 interface DashboardProps {
   data: TicketRecord[];
+  key?: React.Key;
 }
 
 const countFrequencies = (data: any[], key: keyof TicketRecord): ChartData[] => {

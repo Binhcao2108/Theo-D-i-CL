@@ -513,6 +513,7 @@ export function Dashboard({ data }: DashboardProps) {
           <table className="w-full text-left text-sm text-slate-600 border-collapse whitespace-nowrap">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50/50 sticky top-0 z-10 shadow-sm backdrop-blur-md">
               <tr>
+                <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">TG Tạo</th>
                 <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">Số Hợp Đồng</th>
                 <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">KTV</th>
                 <th className="px-6 py-4 border-b border-slate-200 font-display font-semibold tracking-wide text-slate-700">Tập Điểm (POP)</th>
@@ -526,6 +527,7 @@ export function Dashboard({ data }: DashboardProps) {
             <tbody>
               {filteredData.length > 0 ? filteredData.map((row, i) => (
                 <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">{row.creationTime || 'N/A'}</td>
                   <td className="px-6 py-4 font-mono text-xs">{row.contractId}</td>
                   <td className="px-6 py-4 font-medium text-slate-700">{row.technician}</td>
                   <td className="px-6 py-4">{row.pop}</td>
@@ -537,7 +539,7 @@ export function Dashboard({ data }: DashboardProps) {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                     Không có dữ liệu phù hợp với bộ lọc
                   </td>
                 </tr>

@@ -48,6 +48,7 @@ export const parseExcelFile = async (file: File): Promise<{ data: TicketRecord[]
           errorElement: matchColumn(headers, ['(cấp 1)phần tử lỗi', '(cap 1)phan tu loi']),
           errorCause: matchColumn(headers, ['(cấp 1)nguyên nhân lỗi', '(cap 1)nguyen nhan loi']),
           treatmentDirection: matchColumn(headers, ['(cấp 1)hướng xử lý', '(cap 1)huong xu ly']),
+          creationTime: matchColumn(headers, ['tg tạo', 'thời gian tạo', 'thoi gian tao']),
         };
 
         const records: TicketRecord[] = jsonData.map((row: any) => ({
@@ -59,6 +60,7 @@ export const parseExcelFile = async (file: File): Promise<{ data: TicketRecord[]
           errorElement: mapping.errorElement ? String(row[mapping.errorElement]) : 'N/A',
           errorCause: mapping.errorCause ? String(row[mapping.errorCause]) : 'N/A',
           treatmentDirection: mapping.treatmentDirection ? String(row[mapping.treatmentDirection]) : 'N/A',
+          creationTime: mapping.creationTime ? String(row[mapping.creationTime]) : 'N/A',
         }));
 
         resolve({ data: records, mapping, headers });

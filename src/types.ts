@@ -8,6 +8,7 @@ export interface TicketRecord {
   errorCause: string;
   treatmentDirection: string;
   sourceFile?: string;
+  creationTime?: string;
 }
 
 export interface ColumnMapping {
@@ -19,6 +20,7 @@ export interface ColumnMapping {
   errorElement: string;
   errorCause: string;
   treatmentDirection: string;
+  creationTime?: string;
 }
 
 export interface ChartData {

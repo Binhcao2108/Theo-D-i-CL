@@ -21,8 +21,12 @@ async function startServer() {
       const ai = new GoogleGenAI({ apiKey });
 
       const prompt = `
-Dựa vào dữ liệu thống kê lỗi sau đây, hãy viết một nhận định ngắn gọn (khoảng 3-4 đoạn, gạch đầu dòng rõ ràng) bằng tiếng Việt.
-Phân tích nguyên nhân chính gây lỗi, block quản lý nào đang gặp vấn đề nhiều nhất, và đưa ra 1-2 đề xuất khắc phục khả thi.
+Hãy đóng vai một chuyên gia phân tích dữ liệu vận hành. Dựa vào tóm tắt số liệu sự cố dưới đây, hãy đưa ra một đánh giá CHUYÊN SÂU và NGẮN GỌN (tối đa 3 đoạn). 
+Yêu cầu:
+- Tuyệt đối KHÔNG liệt kê lại hay đọc lại các con số (tỉ lệ, số lượng) một cách máy móc. 
+- Tập trung phân tích xu hướng: Nguyên nhân cốt lõi là gì? Điểm nóng (hotspot) nằm ở block quản lý hay phần tử nào?
+- Đưa ra 1-2 hành động chiến lược thiết thực để khắc phục vấn đề.
+- Hành văn súc tích, chuyên nghiệp.
 
 Dữ liệu tóm tắt:
 ${JSON.stringify(dataSummary, null, 2)}
